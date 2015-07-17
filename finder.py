@@ -4,10 +4,12 @@ import os
 LOOKUP_EXTENSIONS = [".cshtml", ".gif", ".jpg", ".png", ".js", ".css"]
 FILES_TO_SEARCH = [".cshtml", ".cs", ".css", ".less", ".js"]
 
+FILES = []
+
 def main(argv):
 	directory = argv[0]
 
-	files_to_look_for = find_view_files_in_directory(directory)
+	files_to_look_for = load_files_in_directory(directory)
 
 	print_break()
 	print("Loading files...")
@@ -22,7 +24,7 @@ def main(argv):
 	results = {'using': [], 'not_using': []}
 
 	for file_name in files_to_look_for:
-		references, looked_at = find_references_for_view_file(directory, file_name)
+		references = find_references_for_file(directory, file_name)
 
 		if references:
 			results['using'].append(file_name)
@@ -43,30 +45,32 @@ def prepare_file_name_to_look_for(file_name):
 
 	return file_name
 
-def find_references_for_view_file(directory, file_name):
+def find_references_for_file(directory, file_name):
 	using = []
-	looking_in = []
+
+	for file in FILES:
+		with open(file, 'r', encoding="ISO-8859-1") as searchfile:
+			content = searchfile.read()
+			if prepare_file_name_to_look_for(file_name) in content:
+				using.append(file_name)
+
+	return using
+
+def load_files_in_directory(directory):
+	files_to_search_for = []
+
+	desired_extensions = list(set(LOOKUP_EXTENSIONS + FILES_TO_SEARCH))
 
 	for root, directories, files in os.walk(directory):
-		for filename in [f for f in files if any([f.endswith(ext) for ext in FILES_TO_SEARCH])]:
-			looking_in.append(os.path.join(root, filename))
-			with open(os.path.join(root, filename), 'r', encoding="ISO-8859-1") as searchfile:
-				content = searchfile.read()
-				if prepare_file_name_to_look_for(file_name) in content:
-					using.append(filename)
+		for filename in [f for f in files]:
+			file_ext = ".{0}".format(filename.split(".")[-1])
 
-	return (using, looking_in)
+			if file_ext in desired_extensions:
+				FILES.append(os.path.join(root, filename))
+			if file_ext in LOOKUP_EXTENSIONS:
+				files_to_search_for.append(filename)
 
-
-def find_view_files_in_directory(directory):
-	views = []
-
-	for root, directories, files in os.walk(directory):
-		for ext in LOOKUP_EXTENSIONS:
-			for filename in [f for f in files if f.endswith(ext)]:
-				views.append(filename)
-
-	return views
+	return files_to_search_for
 
 if __name__ == "__main__":
 	if len(sys.argv) == 1:
